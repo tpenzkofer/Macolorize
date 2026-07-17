@@ -64,6 +64,9 @@ targets:
           CODE_SIGN_IDENTITY: "Developer ID Application"
           DEVELOPMENT_TEAM: ZM6YGES9JH
           OTHER_CODE_SIGN_FLAGS: "--timestamp"
+          # Never embed the debugger entitlement in distribution builds
+          # (notarization rejects get-task-allow).
+          CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
 
   MacolorizeCLI:
     type: tool

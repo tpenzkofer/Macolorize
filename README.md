@@ -69,11 +69,11 @@ is ~1.5 GB. About 1.3 GB of the footprint is the loaded model weights
 
 ## Install
 
-From [Releases](../../releases): download the app zip (~1 MB) and
-`Macolorize-Models.zip` (1.4 GB, changes rarely). Unzip the app, move it to
-Applications, right-click → Open (ad-hoc signed), then use the inspector's
-**Install Models…** button to import the models zip — AI stages unlock
-immediately and the zip can be deleted.
+From [Releases](../../releases): download the DMG (signed and notarized —
+opens without security warnings), drag Macolorize to Applications, then click
+**Download Models** in the inspector (1.4 GB, one-time; or import
+`Macolorize-Models.zip` manually with **Install from Zip…**). AI stages
+unlock immediately.
 
 Or build from source:
 
