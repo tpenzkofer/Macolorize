@@ -67,12 +67,24 @@ public struct FaceRestoreStage: ProcessingStage {
         return output
     }
 
-    /// White disc (r≈200) blurred 40 px, centered in the 512 crop — covers
-    /// the face while fading out before hair/background seams can show.
+    /// Elliptical gradient mask covering the face region of the 512 crop.
+    /// Deliberately not a blurred rectangle: straight mask edges ghost as
+    /// faint horizontal/vertical lines in flat backgrounds; a curved falloff
+    /// doesn't read as a line.
     nonisolated(unsafe) static let featherMask: CIImage = {
-        CIImage(color: .white)
-            .cropped(to: CGRect(x: 96, y: 76, width: 320, height: 380))
-            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: 42])
+        let circle = CIImage(color: .white).applyingFilter("CIRadialGradient", parameters: [
+            "inputCenter": CIVector(x: 256, y: 256),
+            "inputRadius0": 130,
+            "inputRadius1": 245,
+            "inputColor0": CIColor.white,
+            "inputColor1": CIColor.black,
+        ])
+        // Stretch vertically into a face-shaped ellipse, recenter on the
+        // eyes/mouth region of the FFHQ template.
+        return circle
+            .transformed(by: CGAffineTransform(translationX: -256, y: -256)
+                .concatenating(.init(scaleX: 1.0, y: 1.25))
+                .concatenating(.init(translationX: 256, y: 266)))
             .cropped(to: CGRect(x: 0, y: 0, width: 512, height: 512))
     }()
 }

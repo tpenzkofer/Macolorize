@@ -15,7 +15,11 @@ public struct ColorizeStage: ProcessingStage {
     }
 
     public func apply(to input: PipelineImage, context: RenderContext) async throws -> PipelineImage {
-        let modelID: ModelID = settings.variant == .artistic ? .ddcolorArtistic : .ddcolor
+        // Counter-intuitive mapping, verified by eye: DDColor's "artistic"
+        // checkpoint is the restrained/painterly one, the modelscope
+        // checkpoint the punchy one. Labels follow perceived behavior:
+        // Natural → artistic weights, Vivid → modelscope weights.
+        let modelID: ModelID = settings.variant == .artistic ? .ddcolor : .ddcolorArtistic
         let model = try await ModelStore.shared.model(modelID)
         let extent = input.image.extent
         let size = Self.modelInputSize
