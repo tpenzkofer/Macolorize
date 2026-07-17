@@ -55,8 +55,15 @@ targets:
     settings:
       base:
         ENABLE_HARDENED_RUNTIME: YES
-        CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_STYLE: Manual
+      configs:
+        Debug:
+          CODE_SIGN_IDENTITY: "-"
+        Release:
+          # Developer ID distribution signing with secure timestamp.
+          CODE_SIGN_IDENTITY: "Developer ID Application"
+          DEVELOPMENT_TEAM: ZM6YGES9JH
+          OTHER_CODE_SIGN_FLAGS: "--timestamp"
 
   MacolorizeCLI:
     type: tool
