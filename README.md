@@ -106,5 +106,8 @@ Models: [DDColor](https://github.com/piddnad/DDColor) (Apache-2.0),
 [DRUNet](https://github.com/cszn/KAIR) (MIT),
 [Bringing Old Photos Back to Life](https://github.com/microsoft/Bringing-Old-Photos-Back-to-Life) scratch detector (MIT).
 
+All bundled models were chosen for permissive licenses (Apache-2.0 / MIT /
+BSD-3) that allow redistribution of the converted Core ML versions — see
+[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for the full notices.
 Sample photos in `SampleImages/` and screenshots use public-domain material
 (Library of Congress / Wikimedia Commons) and synthetic test scans only.

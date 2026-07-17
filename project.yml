@@ -35,6 +35,8 @@ targets:
       - path: Macolorize/UI
       - path: Macolorize/Resources
         optional: true
+      - path: THIRD_PARTY_LICENSES.md
+        buildPhase: resources
       # Converted Core ML models (make models); compiled into the app bundle.
       # Add each model here once its conversion script exists.
       - path: Models/RealESRGAN_x2plus.mlpackage
