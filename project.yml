@@ -10,6 +10,8 @@ settings:
     SWIFT_VERSION: "6.0"
     ENABLE_TESTABILITY: YES
     DEAD_CODE_STRIPPING: YES
+    # Apple Silicon only: the pipeline uses Float16 and the ANE.
+    ARCHS: arm64
 
 targets:
   MacolorizeCore:
