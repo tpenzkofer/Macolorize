@@ -1,0 +1,27 @@
+# Xcode / build
+*.xcodeproj
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Core ML artifacts (regenerate with `make models`)
+Models/*.mlpackage
+Models/*.mlmodelc
+
+# Python tooling
+tools/.venv/
+tools/__pycache__/
+tools/weights/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Generated outputs and per-image session state
+**/Macolorized/
+**/.macolorize/
+
+# Vendored conversion repos and demo scans (regenerate: tools/make_samples.py)
+tools/vendor/
+SampleImages/*.tif

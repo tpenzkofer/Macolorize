@@ -1,0 +1,114 @@
+name: Macolorize
+options:
+  bundleIdPrefix: com.penzkofer
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    ENABLE_TESTABILITY: YES
+    DEAD_CODE_STRIPPING: YES
+
+targets:
+  MacolorizeCore:
+    type: library.static
+    platform: macOS
+    sources:
+      - path: Macolorize/Pipeline
+        optional: true
+      - path: Macolorize/ML
+        optional: true
+      - path: Macolorize/IO
+        optional: true
+      - path: Macolorize/Batch
+        optional: true
+
+  Macolorize:
+    type: application
+    platform: macOS
+    sources:
+      - path: Macolorize/App
+      - path: Macolorize/UI
+      - path: Macolorize/Resources
+        optional: true
+      # Converted Core ML models (make models); compiled into the app bundle.
+      # Add each model here once its conversion script exists.
+      - path: Models/RealESRGAN_x2plus.mlpackage
+        optional: true
+      - path: Models/RealESRGAN_general_x4v3.mlpackage
+        optional: true
+      - path: Models/DDColor.mlpackage
+        optional: true
+      - path: Models/LaMa.mlpackage
+        optional: true
+      - path: Models/GFPGAN.mlpackage
+        optional: true
+      - path: Models/DDColor_artistic.mlpackage
+        optional: true
+      - path: Models/DRUNet.mlpackage
+        optional: true
+      - path: Models/ScratchNet.mlpackage
+        optional: true
+    dependencies:
+      - target: MacolorizeCore
+    info:
+      path: Macolorize/Info.plist
+      properties:
+        CFBundleDisplayName: Macolorize
+        LSApplicationCategoryType: public.app-category.photography
+        NSHumanReadableCopyright: ""
+    entitlements:
+      path: Macolorize/Macolorize.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-write: true
+        com.apple.security.files.bookmarks.app-scope: true
+    settings:
+      base:
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+
+  MacolorizeCLI:
+    type: tool
+    platform: macOS
+    sources:
+      - path: MacolorizeCLI
+    dependencies:
+      - target: MacolorizeCore
+    settings:
+      base:
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+
+  MacolorizeTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: MacolorizeTests
+    dependencies:
+      - target: MacolorizeCore
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Macolorize:
+    build:
+      targets:
+        Macolorize: all
+        MacolorizeCLI: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - MacolorizeTests
+  MacolorizeCLI:
+    build:
+      targets:
+        MacolorizeCLI: all
+    run:
+      config: Debug

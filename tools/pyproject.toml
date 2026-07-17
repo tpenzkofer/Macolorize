@@ -1,0 +1,18 @@
+[project]
+name = "macolorize-tools"
+version = "0.1.0"
+description = "Model download + Core ML conversion scripts for Macolorize"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "coremltools>=8.0",
+    "torch==2.2.2",
+    "numpy<2",
+    "pillow",
+    "requests",
+    "timm>=1.0.28",
+    "torchvision==0.17.2",
+    "opencv-python-headless<5",
+    "huggingface-hub>=1.23.0",
+    "basicsr>=1.4.2",
+    "facexlib>=0.3.0",
+]
