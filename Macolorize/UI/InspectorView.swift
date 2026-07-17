@@ -3,16 +3,20 @@ import MacolorizeCore
 
 struct InspectorView: View {
     @Bindable var session: EditSession
+    @Environment(ModelLibrary.self) private var modelLibrary
 
     @State private var presetStore = PresetStore()
     @State private var showSavePreset = false
     @State private var presetName = ""
+    @State private var showModelImporter = false
+    @State private var isInstallingModels = false
+    @State private var installMessage: String?
 
-    private let sharpenAvailable = ModelStore.isAvailable(.realesrganX2)
-    private let colorizeAvailable = ModelStore.isAvailable(.ddcolor)
-    private let retouchModelAvailable = ModelStore.isAvailable(.lama)
-    private let facesAvailable = ModelStore.isAvailable(.gfpgan)
-    private let denoiseAvailable = ModelStore.isAvailable(.drunet)
+    private var sharpenAvailable: Bool { modelLibrary.has(.realesrganX2) }
+    private var colorizeAvailable: Bool { modelLibrary.has(.ddcolor) }
+    private var retouchModelAvailable: Bool { modelLibrary.has(.lama) }
+    private var facesAvailable: Bool { modelLibrary.has(.gfpgan) }
+    private var denoiseAvailable: Bool { modelLibrary.has(.drunet) }
 
     var body: some View {
         Form {
@@ -20,6 +24,32 @@ struct InspectorView: View {
                 Section {
                     HistogramView(data: histogram)
                         .frame(height: 72)
+                }
+            }
+
+            if !modelLibrary.allInstalled {
+                Section("AI Models") {
+                    Text("\(modelLibrary.missingCount) of \(ModelLibrary.required.count) models are not installed. Download Macolorize-Models.zip from the release, then import it here.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button {
+                        showModelImporter = true
+                    } label: {
+                        if isInstallingModels {
+                            HStack(spacing: 8) {
+                                ProgressView().controlSize(.small)
+                                Text("Installing…")
+                            }
+                        } else {
+                            Label("Install Models…", systemImage: "square.and.arrow.down.on.square")
+                        }
+                    }
+                    .disabled(isInstallingModels)
+                    if let installMessage {
+                        Text(installMessage)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
 
@@ -74,7 +104,7 @@ struct InspectorView: View {
                 }
                 .disabled(!session.recipe.clean.enabled || !retouchModelAvailable)
 
-                if ModelStore.isAvailable(.scratchnet) {
+                if modelLibrary.has(.scratchnet) {
                     Toggle("Detect Long Scratches (ML)", isOn: $session.recipe.clean.detectScratches)
                         .disabled(!session.recipe.clean.enabled || !retouchModelAvailable)
                 }
@@ -153,7 +183,7 @@ struct InspectorView: View {
                     .disabled(!colorizeAvailable)
 
                 Group {
-                    if ModelStore.isAvailable(.ddcolorArtistic) {
+                    if modelLibrary.has(.ddcolorArtistic) {
                         Picker("Style", selection: $session.recipe.colorize.variant) {
                             ForEach(ColorizeVariant.allCases) { variant in
                                 Text(variant.label).tag(variant)
@@ -224,6 +254,24 @@ struct InspectorView: View {
             }
         }
         .formStyle(.grouped)
+        .fileImporter(isPresented: $showModelImporter,
+                      allowedContentTypes: [.zip, .package]) { result in
+            guard case .success(let url) = result else { return }
+            isInstallingModels = true
+            installMessage = nil
+            Task {
+                defer { isInstallingModels = false }
+                do {
+                    let count = try await Task.detached(priority: .userInitiated) {
+                        try ModelInstaller.install(from: url)
+                    }.value
+                    modelLibrary.refresh()
+                    installMessage = "Installed \(count) model\(count == 1 ? "" : "s")."
+                } catch {
+                    installMessage = error.localizedDescription
+                }
+            }
+        }
         .alert("Save Preset", isPresented: $showSavePreset) {
             TextField("Preset Name", text: $presetName)
             Button("Save") {

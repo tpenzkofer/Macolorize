@@ -25,3 +25,4 @@ tools/weights/
 # Vendored conversion repos and demo scans (regenerate: tools/make_samples.py)
 tools/vendor/
 SampleImages/*.tif
+dist/

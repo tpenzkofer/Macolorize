@@ -37,24 +37,6 @@ targets:
         optional: true
       - path: THIRD_PARTY_LICENSES.md
         buildPhase: resources
-      # Converted Core ML models (make models); compiled into the app bundle.
-      # Add each model here once its conversion script exists.
-      - path: Models/RealESRGAN_x2plus.mlpackage
-        optional: true
-      - path: Models/RealESRGAN_general_x4v3.mlpackage
-        optional: true
-      - path: Models/DDColor.mlpackage
-        optional: true
-      - path: Models/LaMa.mlpackage
-        optional: true
-      - path: Models/GFPGAN.mlpackage
-        optional: true
-      - path: Models/DDColor_artistic.mlpackage
-        optional: true
-      - path: Models/DRUNet.mlpackage
-        optional: true
-      - path: Models/ScratchNet.mlpackage
-        optional: true
     dependencies:
       - target: MacolorizeCore
     info:

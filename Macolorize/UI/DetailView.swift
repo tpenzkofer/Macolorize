@@ -26,7 +26,8 @@ struct DetailView: View {
 
     private var compareEnabled: Bool { appState.compareEnabled }
 
-    private let retouchAvailable = ModelStore.isAvailable(.lama)
+    @Environment(ModelLibrary.self) private var modelLibrary
+    private var retouchAvailable: Bool { modelLibrary.has(.lama) }
     @State private var showInspector = true
     @State private var exportMessage: String?
     @State private var exportError: String?

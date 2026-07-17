@@ -70,6 +70,13 @@ public actor ModelStore {
         locate(id) != nil
     }
 
+    /// Where imported models live: Application Support (the sandbox container
+    /// for the app, the real ~/Library for the CLI).
+    public static var installDirectory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("Macolorize/Models", isDirectory: true)
+    }
+
     static func locate(_ id: ModelID) -> URL? {
         var candidates: [URL] = []
         if let bundled = Bundle.main.url(forResource: id.rawValue, withExtension: "mlmodelc") {
@@ -82,6 +89,7 @@ public actor ModelStore {
         if let custom = ProcessInfo.processInfo.environment["MACOLORIZE_MODELS_DIR"] {
             directories.append(URL(fileURLWithPath: custom, isDirectory: true))
         }
+        directories.append(installDirectory)
         directories.append(URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             .appendingPathComponent("Models", isDirectory: true))
         for directory in directories {

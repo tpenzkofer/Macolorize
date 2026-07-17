@@ -3,11 +3,13 @@ import SwiftUI
 @main
 struct MacolorizeApp: App {
     @State private var appState = AppState()
+    @State private var modelLibrary = ModelLibrary()
 
     var body: some Scene {
         WindowGroup {
             MainWindow()
                 .environment(appState)
+                .environment(modelLibrary)
         }
         .defaultLaunchBehavior(.presented)
         .commands {
