@@ -11,6 +11,7 @@ struct InspectorView: View {
     @State private var showModelImporter = false
     @State private var isInstallingModels = false
     @State private var installMessage: String?
+    @State private var downloader = ModelDownloader()
 
     private var sharpenAvailable: Bool { modelLibrary.has(.realesrganX2) }
     private var colorizeAvailable: Bool { modelLibrary.has(.ddcolor) }
@@ -29,9 +30,37 @@ struct InspectorView: View {
 
             if !modelLibrary.allInstalled {
                 Section("AI Models") {
-                    Text("\(modelLibrary.missingCount) of \(ModelLibrary.required.count) models are not installed. Download Macolorize-Models.zip from the release, then import it here.")
+                    Text("\(modelLibrary.missingCount) of \(ModelLibrary.required.count) AI models are not installed (1.4 GB, one-time).")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+
+                    switch downloader.phase {
+                    case .downloading(let fraction):
+                        VStack(alignment: .leading, spacing: 4) {
+                            ProgressView(value: fraction)
+                            Text("Downloading… \(Int(fraction * 100))%")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    case .installing:
+                        HStack(spacing: 8) {
+                            ProgressView().controlSize(.small)
+                            Text("Installing…").font(.caption)
+                        }
+                    default:
+                        Button {
+                            downloader.start(library: modelLibrary)
+                        } label: {
+                            Label("Download Models", systemImage: "arrow.down.circle")
+                        }
+                        .disabled(isInstallingModels)
+                    }
+                    if case .failed(let message) = downloader.phase {
+                        Text(message)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
                     Button {
                         showModelImporter = true
                     } label: {
@@ -41,10 +70,10 @@ struct InspectorView: View {
                                 Text("Installing…")
                             }
                         } else {
-                            Label("Install Models…", systemImage: "square.and.arrow.down.on.square")
+                            Label("Install from Zip…", systemImage: "square.and.arrow.down.on.square")
                         }
                     }
-                    .disabled(isInstallingModels)
+                    .disabled(isInstallingModels || downloader.isBusy)
                     if let installMessage {
                         Text(installMessage)
                             .font(.caption)
@@ -254,6 +283,13 @@ struct InspectorView: View {
             }
         }
         .formStyle(.grouped)
+        .task {
+            // Test/CI hook: start the model download automatically.
+            if ProcessInfo.processInfo.environment["MACOLORIZE_AUTO_DOWNLOAD"] != nil,
+               !modelLibrary.allInstalled, !downloader.isBusy {
+                downloader.start(library: modelLibrary)
+            }
+        }
         .fileImporter(isPresented: $showModelImporter,
                       allowedContentTypes: [.zip, .package]) { result in
             guard case .success(let url) = result else { return }
