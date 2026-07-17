@@ -49,6 +49,24 @@ preserved exactly through colorization (unit-tested), only detected defects
 and faces are re-synthesized, and you keep full resolution, 16-bit depth,
 batch throughput, and privacy.
 
+## System requirements
+
+Apple Silicon Mac (M1 or later), macOS 15+. Measured peak memory (unified,
+via `/usr/bin/time -l`, all stages enabled — dust/scratch removal, face
+restoration, colorization, denoise, 2× super-resolution):
+
+| Workload | Peak footprint |
+|---|---|
+| Fade restore only, 6 MP scan | 0.2 GB |
+| Full pipeline, 6 MP scan | 3.3 GB |
+| Full pipeline, 24 MP scan (→ 96 MP output) | 3.7 GB |
+| Batch (2 scans concurrently, worst case) | ~6 GB |
+
+8 GB Macs handle interactive editing and single exports fine; 16 GB is
+comfortable for batch runs on large scans. Disk: the app with bundled models
+is ~1.5 GB. About 1.3 GB of the footprint is the loaded model weights
+(shared across images in a batch).
+
 ## Install
 
 Grab **Macolorize.app** from [Releases](../../releases) (models included,
