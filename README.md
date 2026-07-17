@@ -69,14 +69,20 @@ is ~1.5 GB. About 1.3 GB of the footprint is the loaded model weights
 
 ## Install
 
-Grab **Macolorize.app** from [Releases](../../releases) (models included,
-ready to run), or build from source:
+From [Releases](../../releases): download the app zip (~1 MB) and
+`Macolorize-Models.zip` (1.4 GB, changes rarely). Unzip the app, move it to
+Applications, right-click → Open (ad-hoc signed), then use the inspector's
+**Install Models…** button to import the models zip — AI stages unlock
+immediately and the zip can be deleted.
+
+Or build from source:
 
 ```sh
-make models   # one-time: download weights + convert to Core ML (~2.5 GB traffic)
-make build    # generate the Xcode project and build
-make run      # launch the app
-make test     # unit tests
+make models          # one-time: download weights + convert to Core ML (~2.5 GB traffic)
+make build           # generate the Xcode project and build
+make run             # launch the app (then: make install-models to seed the dev build)
+make test            # unit tests
+make release VERSION=x.y.z   # slim app zip + models zip into dist/
 ```
 
 Requirements to build: Xcode 16+, [XcodeGen](https://github.com/yonaskolb/XcodeGen),
