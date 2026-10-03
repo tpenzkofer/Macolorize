@@ -272,12 +272,17 @@ struct DetailView: View {
                     withAnimation(.snappy) { canvasTransform = CanvasTransform() }
                 }
                 Button("Actual Pixels (100%)") {
-                    guard let extent = appState.session?.originalImage?.extent,
+                    guard let session = appState.session,
+                          let extent = session.originalImage?.extent,
                           canvasSize.width > 0, extent.width > 0 else { return }
                     let fit = min(canvasSize.width / extent.width,
                                   canvasSize.height / extent.height)
                     let screenScale = NSScreen.main?.backingScaleFactor ?? 2
-                    canvasTransform = CanvasTransform(zoom: 1 / (fit * screenScale), pan: .zero)
+                    // One FULL-RESOLUTION pixel per device pixel — the canvas
+                    // holds the proxy, so scale up by the proxy ratio.
+                    let ratio = session.fullResolutionPerProxyPixel
+                    canvasTransform = CanvasTransform(zoom: ratio / (fit * screenScale),
+                                                      pan: .zero)
                 }
             } label: {
                 Label("Zoom", systemImage: "plus.magnifyingglass")

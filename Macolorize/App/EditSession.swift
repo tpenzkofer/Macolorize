@@ -68,6 +68,13 @@ final class EditSession {
 
     /// Untouched proxy, for the compare wipe.
     var originalImage: CIImage? { loaded.map { oriented($0.proxy) } }
+
+    /// How many full-resolution pixels one proxy pixel spans (≥ 1). Used so
+    /// "Actual Pixels" zoom means real image pixels, not proxy pixels.
+    var fullResolutionPerProxyPixel: CGFloat {
+        guard let loaded else { return 1 }
+        return max(loaded.pixelSize.width / max(loaded.proxy.extent.width, 1), 1)
+    }
     /// What the canvas shows.
     var displayImage: CIImage? { processedProxy ?? originalImage }
 
@@ -105,7 +112,10 @@ final class EditSession {
         let input = PipelineImage(
             image: proxy,
             originalExtent: proxy.extent,
-            scale: proxy.extent.width / max(loaded.pixelSize.width, 1))
+            scale: proxy.extent.width / max(loaded.pixelSize.width, 1),
+            // Analyzing stages must see full resolution even in preview, so
+            // preview tone curves match the export exactly (issue #1).
+            statsSource: oriented(loaded.fullResolution))
         let mask = strokes.isEmpty ? nil : RetouchMask.rasterize(
             strokes: strokes, size: proxy.extent.size)
         let hints = colorHints

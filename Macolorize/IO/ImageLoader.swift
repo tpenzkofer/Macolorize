@@ -29,8 +29,11 @@ public enum ImageLoaderError: Error, LocalizedError {
 }
 
 public enum ImageLoader {
-    /// Long-edge size of the interactive preview proxy.
-    public static let proxyMaxDimension: CGFloat = 2048
+    /// Long-edge size of the interactive preview proxy. 4096 keeps typical
+    /// 4K archive scans at full resolution in the preview (issue #1: a 2048
+    /// proxy showed ~half resolution and made preview diverge from export);
+    /// larger scans still use a proxy and re-render fully on export.
+    public static let proxyMaxDimension: CGFloat = 4096
 
     public static func load(_ url: URL) throws -> LoadedImage {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),

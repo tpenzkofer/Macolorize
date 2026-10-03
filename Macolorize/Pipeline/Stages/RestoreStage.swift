@@ -14,31 +14,43 @@ public struct RestoreStage: ProcessingStage {
     }
 
     public func apply(to input: PipelineImage, context: RenderContext) async throws -> PipelineImage {
-        let stats = try Self.analyze(input.image, ciContext: context.ciContext)
+        // Analyze the full-resolution statsSource, never the (possibly
+        // proxy) working image — identical tone curves in preview and export.
+        let stats = try Self.analyze(input.statsSource, ciContext: context.ciContext)
         let transform = Self.channelTransform(from: stats, settings: settings)
+        if ProcessInfo.processInfo.environment["MACOLORIZE_DEBUG_RESTORE"] != nil {
+            let line = String(format: "restore transform: scale(%.4f %.4f %.4f) bias(%.4f %.4f %.4f) input %dx%d\n",
+                              transform.scale.r, transform.scale.g, transform.scale.b,
+                              transform.bias.r, transform.bias.g, transform.bias.b,
+                              Int(input.image.extent.width), Int(input.image.extent.height))
+            FileHandle.standardError.write(Data(line.utf8))
+        }
 
-        var restored = input.image.applyingFilter("CIColorMatrix", parameters: [
-            "inputRVector": CIVector(x: transform.scale.r, y: 0, z: 0, w: 0),
-            "inputGVector": CIVector(x: 0, y: transform.scale.g, z: 0, w: 0),
-            "inputBVector": CIVector(x: 0, y: 0, z: transform.scale.b, w: 0),
-            "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
-            "inputBiasVector": CIVector(x: transform.bias.r, y: transform.bias.g, z: transform.bias.b, w: 0),
-        ])
-        restored = restored.applyingFilter("CIColorClamp", parameters: [
-            "inputMinComponents": CIVector(x: 0, y: 0, z: 0, w: 0),
-            "inputMaxComponents": CIVector(x: 1, y: 1, z: 1, w: 1),
-        ])
-
-        if settings.strength < 1 {
-            restored = restored.applyingFilter("CIDissolveTransition", parameters: [
-                kCIInputImageKey: input.image,
-                kCIInputTargetImageKey: restored,
-                kCIInputTimeKey: settings.strength,
-            ]).cropped(to: input.image.extent)
+        func applyCurve(_ source: CIImage) -> CIImage {
+            var result = source.applyingFilter("CIColorMatrix", parameters: [
+                "inputRVector": CIVector(x: transform.scale.r, y: 0, z: 0, w: 0),
+                "inputGVector": CIVector(x: 0, y: transform.scale.g, z: 0, w: 0),
+                "inputBVector": CIVector(x: 0, y: 0, z: transform.scale.b, w: 0),
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 1),
+                "inputBiasVector": CIVector(x: transform.bias.r, y: transform.bias.g, z: transform.bias.b, w: 0),
+            ])
+            result = result.applyingFilter("CIColorClamp", parameters: [
+                "inputMinComponents": CIVector(x: 0, y: 0, z: 0, w: 0),
+                "inputMaxComponents": CIVector(x: 1, y: 1, z: 1, w: 1),
+            ])
+            if settings.strength < 1 {
+                result = result.applyingFilter("CIDissolveTransition", parameters: [
+                    kCIInputImageKey: source,
+                    kCIInputTargetImageKey: result,
+                    kCIInputTimeKey: settings.strength,
+                ]).cropped(to: source.extent)
+            }
+            return result
         }
 
         var output = input
-        output.image = restored
+        output.image = applyCurve(input.image)
+        output.statsSource = applyCurve(input.statsSource)
         return output
     }
 
@@ -68,10 +80,37 @@ public struct RestoreStage: ProcessingStage {
 
     /// Renders a small linear-light bitmap and returns sorted per-channel samples.
     static func analyze(_ image: CIImage, ciContext: CIContext) throws -> ChannelStats {
-        let extent = image.extent
-        let downScale = min(1, analysisMaxDimension / max(extent.width, extent.height))
-        let small = image
-            .transformed(by: .init(scaleX: downScale, y: downScale))
+        // Downsample to the analysis size by ITERATIVE HALVING (each step a
+        // proper prefilter), finishing with one Lanczos step. A single-pass
+        // resample at extreme factors (full res → 256 is ~1/16) aliases, so
+        // the percentile tails depend on the INPUT RESOLUTION and preview
+        // (proxy) vs export (full res) computed visibly different tone
+        // curves (issue #1). The pyramid makes the 256px rendition — and
+        // therefore the statistics — independent of the starting resolution.
+        var small = image.clampedToExtent()
+        var currentExtent = image.extent
+        func resample(_ source: CIImage, by factor: CGFloat) -> CIImage {
+            let target = CGRect(x: currentExtent.minX * factor,
+                                y: currentExtent.minY * factor,
+                                width: currentExtent.width * factor,
+                                height: currentExtent.height * factor)
+            defer { currentExtent = target }
+            return source
+                .applyingFilter("CILanczosScaleTransform", parameters: [
+                    kCIInputScaleKey: factor,
+                    kCIInputAspectRatioKey: 1.0,
+                ])
+                .cropped(to: target)
+                .clampedToExtent()
+        }
+        while max(currentExtent.width, currentExtent.height) > analysisMaxDimension * 2 {
+            small = resample(small, by: 0.5)
+        }
+        let finalScale = min(1, analysisMaxDimension / max(currentExtent.width, currentExtent.height))
+        if finalScale < 1 {
+            small = resample(small, by: finalScale)
+        }
+        small = small.cropped(to: currentExtent)
         let width = max(Int(small.extent.width.rounded(.down)), 1)
         let height = max(Int(small.extent.height.rounded(.down)), 1)
 
