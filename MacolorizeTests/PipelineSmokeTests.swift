@@ -193,6 +193,37 @@ struct PipelineSmokeTests {
                 "flat 0.42 patch → export \(exportValue), preview \(previewValue)")
     }
 
+    /// Issue #1 follow-up: the phase-split pipeline (materialized full-res
+    /// prefix, then suffix) must produce the same result as the single-pass
+    /// export pipeline — the materialization round-trip may only cost
+    /// half-float quantization.
+    @Test func prefixPhaseSplitMatchesSinglePass() async throws {
+        let faded = makeFadedImage()
+        var recipe = Recipe()
+        recipe.negative.enabled = true
+        recipe.restore.enabled = true
+
+        let singlePass = try await ProcessingEngine.shared.run(
+            recipe: recipe, on: PipelineImage(image: faded), mode: .export)
+
+        let (fullRes, proxy) = try await ProcessingEngine.shared.materializedPrefix(
+            recipe: recipe, on: PipelineImage(image: faded),
+            retouchMask: nil, proxyMaxDimension: 4096)
+        let split = try await ProcessingEngine.shared.run(
+            recipe: recipe, on: fullRes, mode: .export, phase: .suffix)
+
+        // 128px input under the 4096 cap: the proxy must be the same rendition.
+        #expect(proxy.image.extent == fullRes.image.extent)
+
+        let a = try RestoreStage.analyze(singlePass.image, ciContext: RenderService.context)
+        let b = try RestoreStage.analyze(split.image, ciContext: RenderService.context)
+        for (lhs, rhs) in [(a.samples.r, b.samples.r),
+                           (a.samples.g, b.samples.g),
+                           (a.samples.b, b.samples.b)] {
+            #expect(abs(a.mean(of: lhs) - b.mean(of: rhs)) < 0.002)
+        }
+    }
+
     @Test func zeroStrengthIsIdentity() async throws {
         let faded = makeFadedImage()
         var settings = RestoreSettings()

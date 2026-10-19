@@ -79,13 +79,30 @@ struct DetailView: View {
                     .onAppear { canvasSize = geometry.size }
                     .onChange(of: geometry.size) { _, newSize in canvasSize = newSize }
                 if compareEnabled {
-                    WipeDivider(wipe: $wipe, size: geometry.size)
+                    WipeDivider(wipe: $wipe, size: geometry.size,
+                                topExclusion: max(geometry.safeAreaInsets.top, 56))
                 }
                 if retouchMode {
                     brushLayer(for: session, viewSize: geometry.size)
                 }
                 if session.isLoading {
                     ProgressView()
+                }
+                if session.previewIsStale {
+                    VStack {
+                        Spacer()
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Updating preview…")
+                        }
+                        .font(.callout)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.regularMaterial, in: Capsule())
+                        .padding(.bottom, 52)
+                    }
+                    .transition(.opacity)
                 }
                 if let message = exportMessage {
                     VStack {
@@ -352,27 +369,42 @@ struct DetailView: View {
 private struct WipeDivider: View {
     @Binding var wipe: CGFloat
     let size: CGSize
+    /// Height of the strip under the window toolbar that must NOT grab the
+    /// drag: the divider's hit area sat beneath the toolbar buttons and made
+    /// them hard to click (issue #1 follow-up — the Retouch toggle).
+    let topExclusion: CGFloat
 
     var body: some View {
         let x = wipe * size.width
+        let dragHeight = max(size.height - topExclusion, 0)
         ZStack {
-            Rectangle()
-                .fill(.white.opacity(0.9))
-                .frame(width: 1.5)
-                .shadow(radius: 2)
-            Image(systemName: "arrow.left.and.right.circle.fill")
-                .font(.title2)
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(.white)
-                .background(Circle().fill(.black.opacity(0.5)))
+            // Decorative line + handle; hit-testing lives on the drag
+            // target below so the toolbar strip stays clickable.
+            ZStack {
+                Rectangle()
+                    .fill(.white.opacity(0.9))
+                    .frame(width: 1.5)
+                    .shadow(radius: 2)
+                Image(systemName: "arrow.left.and.right.circle.fill")
+                    .font(.title2)
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(.white)
+                    .background(Circle().fill(.black.opacity(0.5)))
+            }
+            .frame(maxHeight: .infinity)
+            .position(x: x, y: size.height / 2)
+            .allowsHitTesting(false)
+
+            Color.clear
+                .contentShape(Rectangle())
+                .frame(width: 28, height: dragHeight)
+                .position(x: x, y: topExclusion + dragHeight / 2)
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            wipe = min(max(value.location.x / max(size.width, 1), 0.02), 0.98)
+                        }
+                )
         }
-        .frame(maxHeight: .infinity)
-        .position(x: x, y: size.height / 2)
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { value in
-                    wipe = min(max(value.location.x / max(size.width, 1), 0.02), 0.98)
-                }
-        )
     }
 }
