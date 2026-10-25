@@ -36,6 +36,7 @@ public actor ProcessingEngine {
                                                          mask: retouchMask,
                                                          ciContext: context.ciContext)
             working.statsSource = working.image
+            working.accumulateHealMask(retouchMask)
         }
         for stage in Self.stages(for: recipe, phase: phase) {
             try Task.checkCancellation()
@@ -62,7 +63,7 @@ public actor ProcessingEngine {
                                    on input: PipelineImage,
                                    retouchMask: CIImage?,
                                    proxyMaxDimension: CGFloat) async throws
-        -> (fullRes: PipelineImage, proxy: PipelineImage) {
+        -> (fullRes: PipelineImage, proxy: PipelineImage, healMaskProxy: CIImage?) {
         var full = try await run(recipe: recipe, on: input, mode: .export,
                                  phase: .prefix, retouchMask: retouchMask)
         let ciContext = RenderService.context
@@ -80,7 +81,13 @@ public actor ProcessingEngine {
             originalExtent: proxyImage.extent,
             scale: proxyImage.extent.width / max(full.image.extent.width, 1),
             statsSource: full.image)
-        return (full, proxy)
+        // Everything the prefix repainted, at canvas size, rendered once —
+        // the Show Mask overlay must show the TRUE set of healed pixels.
+        let healMaskProxy = full.healMask.map { mask in
+            let maskProxy = ImageRasterizer.proxy(of: mask, maxDimension: proxyMaxDimension)
+            return ImageRasterizer.materialize(maskProxy, ciContext: ciContext) ?? maskProxy
+        }
+        return (full, proxy, healMaskProxy)
     }
 
     /// Fixed order: negative → clean → restore/colorize → sharpen.

@@ -12,6 +12,18 @@ struct CanvasTransform: Equatable {
 /// updateNSView on state changes, so without this a resize (window drag,
 /// inspector animating in) leaves stale texture content on screen.
 final class CanvasMTKView: MTKView {
+    /// Two-finger trackpad pan (scroll events never reach SwiftUI gestures).
+    var onScroll: ((CGSize) -> Void)?
+
+    override func scrollWheel(with event: NSEvent) {
+        guard let onScroll else {
+            super.scrollWheel(with: event)
+            return
+        }
+        onScroll(CGSize(width: event.scrollingDeltaX,
+                        height: event.scrollingDeltaY))
+    }
+
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
         needsDisplay = true
@@ -39,6 +51,8 @@ struct CanvasView: NSViewRepresentable {
     /// Wipe position as a fraction of the view width.
     var wipe: CGFloat = 0.5
     var transform: CanvasTransform
+    /// Two-finger trackpad scroll, for panning.
+    var onScroll: ((CGSize) -> Void)?
 
     func makeCoordinator() -> CanvasRenderer {
         CanvasRenderer()
@@ -65,6 +79,7 @@ struct CanvasView: NSViewRepresentable {
         context.coordinator.maskOverlay = maskOverlay
         context.coordinator.wipe = wipe
         context.coordinator.transform = transform
+        (view as? CanvasMTKView)?.onScroll = onScroll
         view.needsDisplay = true
     }
 }

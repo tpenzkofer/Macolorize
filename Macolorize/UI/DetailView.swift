@@ -7,6 +7,7 @@ struct DetailView: View {
     @State private var canvasTransform = CanvasTransform()
     @State private var dragStartPan: CGSize?
     @State private var zoomStart: CGFloat?
+    @State private var pinchStartPan: CGSize?
     @State private var wipe: CGFloat = 0.5
     enum BrushTool: String, CaseIterable, Identifiable {
         case heal
@@ -75,18 +76,47 @@ struct DetailView: View {
                            comparisonImage: compareEnabled ? session.originalImage : nil,
                            maskOverlay: session.showDetectionMask ? session.maskOverlay : nil,
                            wipe: wipe,
-                           transform: canvasTransform)
+                           transform: canvasTransform,
+                           onScroll: { delta in
+                               canvasTransform.pan.width += delta.width
+                               canvasTransform.pan.height += delta.height
+                           })
                     .onAppear { canvasSize = geometry.size }
                     .onChange(of: geometry.size) { _, newSize in canvasSize = newSize }
+                if retouchMode {
+                    brushLayer(for: session, viewSize: geometry.size)
+                }
+                // Above the brush layer: grabbing the divider must never
+                // paint a stroke (issue #1 follow-up).
                 if compareEnabled {
                     WipeDivider(wipe: $wipe, size: geometry.size,
                                 topExclusion: max(geometry.safeAreaInsets.top, 56))
                 }
-                if retouchMode {
-                    brushLayer(for: session, viewSize: geometry.size)
-                }
                 if session.isLoading {
                     ProgressView()
+                }
+                if session.restoredFromSidecar {
+                    VStack {
+                        HStack(spacing: 10) {
+                            Image(systemName: "clock.arrow.circlepath")
+                            Text("Restored previous edits")
+                            Button("Reset All") { session.resetEdits() }
+                            Button {
+                                session.dismissRestoredHint()
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .font(.callout)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(.regularMaterial, in: Capsule())
+                        .padding(.top, 12)
+                        Spacer()
+                    }
+                    .transition(.opacity)
                 }
                 if session.previewIsStale {
                     VStack {
@@ -214,22 +244,44 @@ struct DetailView: View {
             .onEnded { _ in dragStartPan = nil }
     }
 
+    /// Pinch zooms about the pinch location, keeping the content under the
+    /// fingers in place (zooming about the center lost the area of interest).
     private var magnifyGesture: some Gesture {
         MagnifyGesture()
             .onChanged { value in
-                if zoomStart == nil { zoomStart = canvasTransform.zoom }
-                canvasTransform.zoom = min(max((zoomStart ?? 1) * value.magnification, 0.2), 64)
+                if zoomStart == nil {
+                    zoomStart = canvasTransform.zoom
+                    pinchStartPan = canvasTransform.pan
+                }
+                let z0 = zoomStart ?? 1
+                let p0 = pinchStartPan ?? .zero
+                let zoom = min(max(z0 * value.magnification, 0.2), 64)
+                // Keep the content point under the pinch anchor fixed:
+                // pan' = a − c − (a − c − pan₀)·(z'/z₀), with a the anchor
+                // and c the view center (content is drawn centered + panned).
+                let anchor = value.startLocation
+                let center = CGPoint(x: canvasSize.width / 2, y: canvasSize.height / 2)
+                let ratio = zoom / max(z0, 0.001)
+                canvasTransform.zoom = zoom
+                canvasTransform.pan = CGSize(
+                    width: anchor.x - center.x - (anchor.x - center.x - p0.width) * ratio,
+                    height: anchor.y - center.y - (anchor.y - center.y - p0.height) * ratio)
             }
-            .onEnded { _ in zoomStart = nil }
+            .onEnded { _ in
+                zoomStart = nil
+                pinchStartPan = nil
+            }
     }
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
-            if appState.session?.isProcessing == true {
-                ProgressView()
-                    .controlSize(.small)
-            }
+            // Always present (hidden when idle): the spinner popping in and
+            // out shifted every toolbar button sideways mid-aim, which made
+            // the Retouch toggle feel impossible to hit (issue #1 follow-up).
+            ProgressView()
+                .controlSize(.small)
+                .opacity(appState.session?.isProcessing == true ? 1 : 0)
 
             if retouchMode {
                 Picker("Tool", selection: $brushTool) {
@@ -312,8 +364,11 @@ struct DetailView: View {
             ) {
                 Label("Show Mask", systemImage: "eye.trianglebadge.exclamationmark")
             }
-            .disabled(appState.session?.recipe.clean.enabled != true)
-            .help("Highlight what dust removal will heal")
+            .disabled({
+                guard let session = appState.session else { return true }
+                return !session.recipe.clean.enabled && session.strokes.isEmpty
+            }())
+            .help("Highlight everything that will be repainted — dust, scratches, and manual heals")
 
             Toggle(isOn: Binding(
                 get: { appState.compareEnabled },
@@ -399,6 +454,7 @@ private struct WipeDivider: View {
                 .contentShape(Rectangle())
                 .frame(width: 28, height: dragHeight)
                 .position(x: x, y: topExclusion + dragHeight / 2)
+                .pointerStyle(.columnResize)
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in

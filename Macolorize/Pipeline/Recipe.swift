@@ -34,7 +34,7 @@ public struct Recipe: Codable, Sendable, Equatable {
 
 public struct DenoiseSettings: Codable, Sendable, Equatable {
     public var enabled = false
-    /// 0…1 → DRUNet sigma 0…25; ~0.3 suits typical film grain.
+    /// 0…1 → DRUNet sigma 0…50 (the model's full trained range).
     public var strength: Double = 0.3
 
     public init() {}
@@ -54,12 +54,18 @@ public struct FaceSettings: Codable, Sendable, Equatable {
     public init() {}
 }
 
+/// Automatic dust/scratch removal is EXPERIMENTAL: it repaints pixels the
+/// user did not choose, and both detectors can wrongly flag film grain or
+/// texture (issue #1). Everything here defaults off; the manual Retouch
+/// brush is the blessed removal path.
 public struct CleanSettings: Codable, Sendable, Equatable {
     public var enabled = false
     /// 0 = only extreme outliers, 1 = aggressive detection.
     public var sensitivity: Double = 0.5
-    /// Also run the ML scratch detector (long structured scratches).
-    public var detectScratches = true
+    /// Also run the ML scratch detector (long structured scratches). Off by
+    /// default: trained on photos, it over-fires on grainy cinema stock and
+    /// LaMa then repaints large regions into smudges.
+    public var detectScratches = false
 
     public init() {}
 
@@ -71,7 +77,7 @@ public struct CleanSettings: Codable, Sendable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
         sensitivity = try container.decodeIfPresent(Double.self, forKey: .sensitivity) ?? 0.5
-        detectScratches = try container.decodeIfPresent(Bool.self, forKey: .detectScratches) ?? true
+        detectScratches = try container.decodeIfPresent(Bool.self, forKey: .detectScratches) ?? false
     }
 }
 

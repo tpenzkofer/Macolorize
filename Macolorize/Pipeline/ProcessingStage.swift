@@ -25,13 +25,28 @@ public struct PipelineImage: @unchecked Sendable {
     /// (issue #1). Stages that change pixel values apply the same transform
     /// here so later analyses stay consistent.
     public var statsSource: CIImage
+    /// Union of everything inpainting repainted (white = healed): manual
+    /// strokes plus automatic dust/scratch detections, at `image` resolution.
+    /// Drives the Show Mask overlay — pixels changing with no red shown was
+    /// the biggest trust breaker of issue #1 (the overlay used to show only
+    /// the classical dust mask, hiding scratch-ML hits and manual heals).
+    public var healMask: CIImage?
 
     public init(image: CIImage, originalExtent: CGRect? = nil, scale: CGFloat = 1,
-                statsSource: CIImage? = nil) {
+                statsSource: CIImage? = nil, healMask: CIImage? = nil) {
         self.image = image
         self.originalExtent = originalExtent ?? image.extent
         self.scale = scale
         self.statsSource = statsSource ?? image
+        self.healMask = healMask
+    }
+
+    public mutating func accumulateHealMask(_ mask: CIImage) {
+        healMask = (healMask.map {
+            mask.applyingFilter("CIMaximumCompositing", parameters: [
+                kCIInputBackgroundImageKey: $0,
+            ])
+        } ?? mask).cropped(to: image.extent)
     }
 }
 

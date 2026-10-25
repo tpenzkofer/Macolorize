@@ -30,6 +30,7 @@ public struct CleanStage: ProcessingStage {
         output.image = try await InpaintStage.apply(to: input.image,
                                                     mask: mask,
                                                     ciContext: context.ciContext)
+        output.accumulateHealMask(mask)
         return output
     }
 

@@ -122,36 +122,6 @@ struct InspectorView: View {
             }
 
             Section {
-                Toggle("Remove Dust & Scratches", isOn: $session.recipe.clean.enabled)
-                    .font(.headline)
-                    .disabled(!retouchModelAvailable)
-
-                VStack(alignment: .leading) {
-                    Text("Sensitivity \(Int(session.recipe.clean.sensitivity * 100))%")
-                        .font(.caption)
-                    Slider(value: $session.recipe.clean.sensitivity, in: 0...1)
-                }
-                .disabled(!session.recipe.clean.enabled || !retouchModelAvailable)
-
-                if modelLibrary.has(.scratchnet) {
-                    Toggle("Detect Long Scratches (ML)", isOn: $session.recipe.clean.detectScratches)
-                        .disabled(!session.recipe.clean.enabled || !retouchModelAvailable)
-                }
-
-                if !retouchModelAvailable {
-                    Text("Model not installed — run `make models` in the project folder.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else if session.recipe.clean.enabled {
-                    Text("Small specks are healed automatically; use the Retouch brush for anything it misses.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                Text("Adjustments")
-            }
-
-            Section {
                 Toggle("Restore Faded Color", isOn: $session.recipe.restore.enabled)
                     .font(.headline)
 
@@ -280,6 +250,36 @@ struct InspectorView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            }
+
+            Section {
+                Toggle("Remove Dust & Scratches", isOn: $session.recipe.clean.enabled)
+                    .font(.headline)
+                    .disabled(!retouchModelAvailable)
+
+                VStack(alignment: .leading) {
+                    Text("Sensitivity \(Int(session.recipe.clean.sensitivity * 100))%")
+                        .font(.caption)
+                    Slider(value: $session.recipe.clean.sensitivity, in: 0...1)
+                }
+                .disabled(!session.recipe.clean.enabled || !retouchModelAvailable)
+
+                if modelLibrary.has(.scratchnet) {
+                    Toggle("Detect Long Scratches (ML)", isOn: $session.recipe.clean.detectScratches)
+                        .disabled(!session.recipe.clean.enabled || !retouchModelAvailable)
+                }
+
+                if !retouchModelAvailable {
+                    Text("Model not installed — run `make models` in the project folder.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Repaints what it detects automatically — it can wrongly flag film grain or texture. Review the red Show Mask overlay (eye icon) before exporting; the Retouch brush is the reliable alternative.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Label("Experimental", systemImage: "flask")
             }
         }
         .formStyle(.grouped)

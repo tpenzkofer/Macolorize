@@ -103,6 +103,9 @@ final class EditSession {
         /// Materialized proxy of `fullRes` (what preview continues from);
         /// its `statsSource` is `fullRes.image`.
         let proxy: PipelineImage
+        /// Canvas-sized mask of EVERYTHING the prefix repainted (dust +
+        /// scratch ML + manual strokes) — the Show Mask overlay.
+        let healMaskProxy: CIImage?
     }
 
     private var prefixCache: PrefixCache?
@@ -138,7 +141,8 @@ final class EditSession {
                 proxy: PipelineImage(
                     image: oriented(loaded.proxy),
                     scale: loaded.proxy.extent.width / max(loaded.pixelSize.width, 1),
-                    statsSource: fullRes))
+                    statsSource: fullRes),
+                healMaskProxy: nil)
             prefixCache = cache
             return cache
         }
@@ -147,12 +151,13 @@ final class EditSession {
         let mask = strokes.isEmpty ? nil : RetouchMask.rasterize(
             strokes: strokes, size: fullRes.extent.size)
         let task = Task<PrefixCache, Error> {
-            let (full, proxy) = try await ProcessingEngine.shared.materializedPrefix(
+            let (full, proxy, healMask) = try await ProcessingEngine.shared.materializedPrefix(
                 recipe: recipe,
                 on: PipelineImage(image: fullRes),
                 retouchMask: mask,
                 proxyMaxDimension: ImageLoader.proxyMaxDimension)
-            return PrefixCache(key: key, fullRes: full, proxy: proxy)
+            return PrefixCache(key: key, fullRes: full, proxy: proxy,
+                               healMaskProxy: healMask)
         }
         prefixTask = (key, task)
         defer { if prefixTask?.key == key { prefixTask = nil } }
@@ -178,6 +183,26 @@ final class EditSession {
         self.recipe = recipe
     }
 
+    /// True when a sidecar from a previous session restored non-default
+    /// edits on load. Drives a visible banner — silently reopening with old
+    /// fixes applied read as "the app caches results" (issue #1 follow-up).
+    private(set) var restoredFromSidecar = false
+
+    func dismissRestoredHint() {
+        restoredFromSidecar = false
+    }
+
+    /// Back to the untouched scan: default recipe, no strokes, no hints, no
+    /// rotation. The cleared state is saved to the sidecar, so the reset
+    /// survives reopening.
+    func resetEdits() {
+        recipe = Recipe()
+        strokes = []
+        colorHints = []
+        rotation = 0
+        restoredFromSidecar = false
+    }
+
     func load() async {
         isLoading = true
         defer { isLoading = false }
@@ -189,6 +214,8 @@ final class EditSession {
                 strokes = sidecar.strokes
                 colorHints = sidecar.colorHints
                 rotation = sidecar.rotation
+                restoredFromSidecar = sidecar != SessionSidecar(recipe: Recipe(),
+                                                                strokes: [])
             }
             loaded = try await Task.detached(priority: .userInitiated) {
                 try ImageLoader.load(url)
@@ -205,7 +232,7 @@ final class EditSession {
         previewTask?.cancel()
         let recipe = recipe
         let hints = colorHints
-        let wantsMaskOverlay = showDetectionMask && recipe.clean.enabled
+        let wantsMaskOverlay = showDetectionMask
         previewTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(80))
             guard !Task.isCancelled, let self else { return }
@@ -222,23 +249,14 @@ final class EditSession {
                 self.processedProxy = result.image
                 self.histogram = Histogram.compute(from: result.image,
                                                    ciContext: RenderService.context)
-                self.maskOverlay = wantsMaskOverlay ? self.detectionOverlay() : nil
+                // The overlay is the prefix's own heal mask: dust + scratch
+                // ML + manual strokes — exactly the pixels that were
+                // repainted, never an approximation computed separately.
+                self.maskOverlay = wantsMaskOverlay ? cache.healMaskProxy : nil
             } catch {
                 // Cancelled or failed preview: keep showing the last good frame.
             }
         }
-    }
-
-    /// Red-overlay mask of what dust removal detects — computed on the FULL
-    /// resolution image (what the pipeline actually heals), then proxied to
-    /// the canvas size. The proxy's softened grain hides most real
-    /// detections, which is exactly what misled preview before.
-    private func detectionOverlay() -> CIImage? {
-        guard let loaded else { return nil }
-        let mask = CleanStage.dustMask(for: oriented(loaded.fullResolution),
-                                       sensitivity: recipe.clean.sensitivity)
-        return ImageRasterizer.proxy(of: mask,
-                                     maxDimension: ImageLoader.proxyMaxDimension)
     }
 
     /// Re-runs the full pipeline at native resolution and writes the result

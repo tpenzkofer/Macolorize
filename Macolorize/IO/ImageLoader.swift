@@ -49,14 +49,17 @@ public enum ImageLoader {
         let proxy: CIImage
         if max(normalized.extent.width, normalized.extent.height) <= proxyMaxDimension {
             proxy = normalized
-        } else if let thumb = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: proxyMaxDimension,
-        ] as CFDictionary) {
-            proxy = CIImage(cgImage: thumb)
         } else {
-            proxy = normalized
+            // Resample with the SAME filter and rounding the pipeline uses
+            // for processed previews (linear-light Lanczos). The ImageIO
+            // thumbnail used before had slightly different scale rounding
+            // and filter phase, so the compare wipe's before/after sides
+            // were misaligned by a growing fraction of a pixel (issue #1
+            // follow-up: "the two sides are not pixel to pixel").
+            let scaled = ImageRasterizer.proxy(of: normalized,
+                                               maxDimension: proxyMaxDimension)
+            proxy = ImageRasterizer.materialize(scaled,
+                                                ciContext: RenderService.context) ?? scaled
         }
 
         return LoadedImage(url: url,

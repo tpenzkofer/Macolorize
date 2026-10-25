@@ -73,6 +73,13 @@ struct MacolorizeApp: App {
                 }
                 .keyboardShortcut("]")
                 .disabled(appState.session == nil)
+
+                Divider()
+
+                Button("Reset All Edits") {
+                    appState.session?.resetEdits()
+                }
+                .disabled(appState.session == nil)
             }
         }
     }

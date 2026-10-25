@@ -206,7 +206,7 @@ struct PipelineSmokeTests {
         let singlePass = try await ProcessingEngine.shared.run(
             recipe: recipe, on: PipelineImage(image: faded), mode: .export)
 
-        let (fullRes, proxy) = try await ProcessingEngine.shared.materializedPrefix(
+        let (fullRes, proxy, _) = try await ProcessingEngine.shared.materializedPrefix(
             recipe: recipe, on: PipelineImage(image: faded),
             retouchMask: nil, proxyMaxDimension: 4096)
         let split = try await ProcessingEngine.shared.run(
@@ -222,6 +222,33 @@ struct PipelineSmokeTests {
                            (a.samples.b, b.samples.b)] {
             #expect(abs(a.mean(of: lhs) - b.mean(of: rhs)) < 0.002)
         }
+    }
+
+    /// The heal-mask union surfaced to the Show Mask overlay: strokes and
+    /// detector masks accumulate; existing coverage is never lost.
+    @Test func healMaskAccumulatesUnion() throws {
+        let extent = CGRect(x: 0, y: 0, width: 64, height: 64)
+        var pipeline = PipelineImage(image: CIImage(color: .gray).cropped(to: extent))
+        func square(_ rect: CGRect) -> CIImage {
+            CIImage(color: .white).cropped(to: rect)
+                .composited(over: CIImage(color: .black).cropped(to: extent))
+        }
+        pipeline.accumulateHealMask(square(CGRect(x: 8, y: 8, width: 8, height: 8)))
+        pipeline.accumulateHealMask(square(CGRect(x: 40, y: 40, width: 8, height: 8)))
+
+        let mask = try #require(pipeline.healMask)
+        #expect(mask.extent == extent)
+        let context = RenderService.context
+        func value(at point: CGPoint) -> UInt8 {
+            var pixel = [UInt8](repeating: 0, count: 4)
+            context.render(mask, toBitmap: &pixel, rowBytes: 4,
+                           bounds: CGRect(x: point.x, y: point.y, width: 1, height: 1),
+                           format: .RGBA8, colorSpace: nil)
+            return pixel[0]
+        }
+        #expect(value(at: CGPoint(x: 12, y: 12)) > 200)   // first mask kept
+        #expect(value(at: CGPoint(x: 44, y: 44)) > 200)   // second mask added
+        #expect(value(at: CGPoint(x: 28, y: 28)) < 20)    // untouched stays black
     }
 
     @Test func zeroStrengthIsIdentity() async throws {
