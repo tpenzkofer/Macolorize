@@ -23,16 +23,22 @@ M-series Mac, output 4400×5670 16-bit TIFF.*
 | Stage | Method | Runs on |
 |---|---|---|
 | Color negative | Film-base estimation + linear-light inversion (no ML) | GPU (Core Image) |
-| Remove dust & scratches | Classical outlier detection + BOPBTL scratch U-Net (MIT) → LaMa inpainting (Apache-2.0) | GPU |
-| Manual retouch brush | Heal (LaMa) or paint color hints, live preview | GPU |
+| Manual retouch brush | Heal dust and scratches (LaMa, Apache-2.0) or paint color hints, live preview | GPU |
 | Restore faded color | Per-channel percentile stretch + gray-world balance (no ML) | GPU (Core Image) |
 | Restore faces | GFPGAN v1.4 (Apache-2.0) + Vision-framework alignment, feathered paste-back | GPU |
 | Colorize B&W | DDColor Natural/Vivid (Apache-2.0), full-res luminance preserved via Lab merge, steerable with painted color hints | ANE/GPU |
-| Reduce film grain | DRUNet blind denoiser (MIT) with adjustable strength | ANE/GPU |
+| Reduce film grain | DRUNet (MIT) driven by a per-pixel noise map: the scan's grain is measured per brightness, so shadows and highlights are smoothed evenly | ANE/GPU |
 | Sharpen & upscale | Real-ESRGAN ×2/×4 (BSD-3), tiled with seam-free stitching | ANE/GPU |
 
+**Experimental** (off by default — it repaints pixels you did not choose, and
+can mistake film grain or texture for defects; always review the red mask):
+
+| Stage | Method | Runs on |
+|---|---|---|
+| Remove dust & scratches | Exposure-invariant outlier detection + optional BOPBTL scratch U-Net (MIT) → LaMa inpainting | GPU |
+
 Interactive editing with a before/after wipe (⌘\), live RGB histogram, a
-red-overlay preview of what dust removal will heal, plus batch processing of
+red-overlay preview of every pixel that will be repainted, plus batch processing of
 whole folders (⌘B) with the current settings:
 
 ![Batch processing sheet applying the current recipe to a folder](docs/screenshot-batch.png)
@@ -106,11 +112,13 @@ macolorize-cli --mask defects.png scan.tif       # inpaint masked regions
 
 - ⌘O open folder · ⌘B batch process folder
 - ⌘R restore · ⌘K colorize · ⌘F faces · ⌘T retouch brush · ⌘\ compare
-- ⌘[ / ⌘] rotate · double-click the canvas to reset zoom; pinch to zoom, drag to pan.
+- ⌘[ / ⌘] rotate · double-click the canvas to reset zoom; pinch to zoom (anchored at the pinch), drag or two-finger scroll to pan.
+- Adjustments ▸ Reset All Edits returns a scan to its untouched state (edits are otherwise restored from the sidecar when you reopen it).
 
 The retouch brush has two tools: **Heal** (LaMa inpaints the stroke) and
 **Color** (pick a color; the colorizer honors it in that region). The eye
-toolbar button previews the dust/scratch detection mask in red.
+toolbar button shows everything that will be repainted in red — manual heals
+and, when enabled, automatic dust/scratch detections.
 
 ## Layout
 

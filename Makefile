@@ -29,7 +29,9 @@ install-models:
 	mkdir -p $(CONTAINER_MODELS)
 	cp -R Models/*.mlpackage $(CONTAINER_MODELS)/
 
-# Release artifacts: signed DMG + models archive (upload both to the GitHub release).
+# Release artifacts: signed DMG + models archives. The base archive stays
+# pinned at v1.1.0; upload only the DMG and Macolorize-Models-Update-1.3.zip
+# (ModelDownloader.archives) to the release.
 VERSION ?= dev
 NOTARY_PROFILE ?= macolorize
 RELEASE_APP := $(DERIVED)/Build/Products/Release/Macolorize.app
@@ -40,6 +42,7 @@ release: generate
 		-destination 'platform=macOS' -derivedDataPath $(DERIVED) build
 	mkdir -p dist
 	ditto -c -k Models dist/Macolorize-Models.zip
+	ditto -c -k --keepParent Models/DRUNetMap.mlpackage dist/Macolorize-Models-Update-1.3.zip
 	$(MAKE) dmg VERSION=$(VERSION)
 	@ls -lh dist/
 

@@ -62,12 +62,13 @@ public struct TiledModelRunner: Sendable {
     }
 
     /// - Parameter featureBuilder: builds the model inputs for one tile
-    ///   buffer; defaults to `[inputName: buffer]`. Use to add extra model
-    ///   inputs (e.g. the denoiser's sigma).
+    ///   buffer and its source rect in image coordinates; defaults to
+    ///   `[inputName: buffer]`. Use to add extra model inputs (e.g. the
+    ///   denoiser's noise map).
     public func run(model: SendableModel,
                     over image: CIImage,
                     ciContext: CIContext,
-                    featureBuilder: (@Sendable (CVPixelBuffer) throws -> MLFeatureProvider)? = nil,
+                    featureBuilder: (@Sendable (CVPixelBuffer, CGRect) throws -> MLFeatureProvider)? = nil,
                     progress: (@Sendable (Double) -> Void)? = nil) async throws -> CIImage {
         guard let kernel = TileBlendKernel.kernel else {
             throw TiledModelRunnerError.kernelUnavailable
@@ -98,7 +99,7 @@ public struct TiledModelRunner: Sendable {
                                  width: CGFloat(tileSize), height: CGFloat(tileSize)),
                                  colorSpace: srgb)
                 if let featureBuilder {
-                    inputs.append(try featureBuilder(buffer))
+                    inputs.append(try featureBuilder(buffer, tile.source))
                 } else {
                     inputs.append(try MLDictionaryFeatureProvider(
                         dictionary: [inputName: MLFeatureValue(pixelBuffer: buffer)]))

@@ -14,6 +14,7 @@ Full license texts follow the summary table.
 | `GFPGAN.mlpackage` | [TencentARC/GFPGAN](https://github.com/TencentARC/GFPGAN) (v1.4, "clean" architecture) | © 2021 THL A29 Limited, a Tencent company | Apache-2.0 | Traced with deterministic noise buffers, converted to Core ML, FP32; [-1,1] domain wrapper |
 | `RealESRGAN_x2plus.mlpackage`, `RealESRGAN_general_x4v3.mlpackage` | [xinntao/Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) | © 2021 Xintao Wang | BSD-3-Clause | Architectures re-declared for tracing, converted to Core ML, FP16; fixed 512×512 tile input |
 | `DRUNet.mlpackage` | [cszn/KAIR](https://github.com/cszn/KAIR) (drunet_color) | © 2019 Kai Zhang | MIT | Converted to Core ML, FP16; scalar sigma → noise-map wrapper |
+| `DRUNetMap.mlpackage` | [cszn/KAIR](https://github.com/cszn/KAIR) (drunet_color, same weights) | © 2019 Kai Zhang | MIT | Converted to Core ML, FP16; per-pixel noise-map input |
 | `ScratchNet.mlpackage` | [microsoft/Bringing-Old-Photos-Back-to-Life](https://github.com/microsoft/Bringing-Old-Photos-Back-to-Life) (scratch-detection U-Net; the README states "the codes and the pretrained model in this repository are under the MIT license") | © Microsoft Corporation | MIT | BatchNorm substituted for SyncBatchNorm (inference-equivalent), converted to Core ML, FP16; sigmoid output wrapper |
 
 Changes to the upstream works are limited to what is listed above; no model

@@ -10,6 +10,8 @@ public enum ModelID: String, CaseIterable, Sendable {
     case dustnet = "DustNet"
     case gfpgan = "GFPGAN"
     case drunet = "DRUNet"
+    /// DRUNet with a per-pixel noise-map input (brightness-adaptive grain).
+    case drunetMap = "DRUNetMap"
     case scratchnet = "ScratchNet"
 
     /// LaMa's Fourier convolutions can't run on the ANE; GFPGAN's StyleGAN

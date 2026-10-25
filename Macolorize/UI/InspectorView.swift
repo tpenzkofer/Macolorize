@@ -17,7 +17,19 @@ struct InspectorView: View {
     private var colorizeAvailable: Bool { modelLibrary.has(.ddcolor) }
     private var retouchModelAvailable: Bool { modelLibrary.has(.lama) }
     private var facesAvailable: Bool { modelLibrary.has(.gfpgan) }
-    private var denoiseAvailable: Bool { modelLibrary.has(.drunet) }
+    private var denoiseAvailable: Bool { modelLibrary.has(.drunet) || modelLibrary.has(.drunetMap) }
+
+    private var modelsMissingMessage: String {
+        let archives = ModelDownloader.neededArchives(missing: modelLibrary.missing)
+        let megabytes = archives.map(\.megabytes).reduce(0, +)
+        let size = megabytes >= 1000
+            ? String(format: "%.1f GB", Double(megabytes) / 1000)
+            : "\(megabytes) MB"
+        if modelLibrary.missing == [.drunetMap] {
+            return "Model update available: brightness-adaptive film grain reduction (\(size))."
+        }
+        return "\(modelLibrary.missingCount) of \(ModelLibrary.required.count) AI models are not installed (\(size), one-time)."
+    }
 
     var body: some View {
         Form {
@@ -30,7 +42,7 @@ struct InspectorView: View {
 
             if !modelLibrary.allInstalled {
                 Section("AI Models") {
-                    Text("\(modelLibrary.missingCount) of \(ModelLibrary.required.count) AI models are not installed (1.4 GB, one-time).")
+                    Text(modelsMissingMessage)
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
@@ -224,6 +236,12 @@ struct InspectorView: View {
 
                 if !denoiseAvailable {
                     Text("Model not installed — run `make models` in the project folder.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if session.recipe.denoise.enabled {
+                    Text(modelLibrary.has(.drunetMap)
+                         ? "Measures the scan's grain and adapts to brightness, so shadows and highlights are smoothed evenly. Heavy grain: start around 80%."
+                         : "Install the model update above for brightness-adaptive grain reduction.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

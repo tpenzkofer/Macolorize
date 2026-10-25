@@ -12,7 +12,7 @@ final class ModelLibrary {
     /// and never exists as a file).
     static let required: [ModelID] = [
         .lama, .gfpgan, .ddcolor, .ddcolorArtistic,
-        .realesrganX2, .realesrganX4, .drunet, .scratchnet,
+        .realesrganX2, .realesrganX4, .drunet, .scratchnet, .drunetMap,
     ]
 
     init() {
@@ -27,9 +27,11 @@ final class ModelLibrary {
         installed.contains(id)
     }
 
-    var missingCount: Int {
-        Self.required.filter { !installed.contains($0) }.count
+    var missing: Set<ModelID> {
+        Set(Self.required.filter { !installed.contains($0) })
     }
+
+    var missingCount: Int { missing.count }
 
     var allInstalled: Bool { missingCount == 0 }
 }
