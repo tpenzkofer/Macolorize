@@ -80,7 +80,8 @@ public enum InpaintStage {
                 kCIInputMaskImageKey: compositeMask,
             ]).cropped(to: image.extent)
         }
-        return result
+        return GrainMatch.apply(healed: result, original: image,
+                                mask: scaledMask, ciContext: ciContext)
     }
 
     /// Expands the mask bbox to at least one tile, preferring to stay inside

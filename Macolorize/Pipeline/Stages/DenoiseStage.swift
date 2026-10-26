@@ -126,6 +126,25 @@ struct GrainProfile: Sendable {
             .applyingFilter("CILinearToSRGBToneCurve")
     }
 
+    /// Two 3×3 passes ≈ a 5×5 median: a single 3×3 tracks the grain
+    /// clumps and under-reads the grain level by ~15%.
+    static func despeckled(_ image: CIImage) -> CIImage {
+        image.applyingFilter("CIMedianFilter").applyingFilter("CIMedianFilter")
+    }
+
+    /// |image − despeckled(image)|, both polarities (blend modes may clamp
+    /// at 0). The grain estimator's residual; GrainMatch normalizes its
+    /// synthetic grain with the same metric.
+    static func residualMagnitude(of image: CIImage) -> CIImage {
+        let median = despeckled(image)
+        let up = image.applyingFilter("CISubtractBlendMode",
+                                      parameters: [kCIInputBackgroundImageKey: median])
+        let down = median.applyingFilter("CISubtractBlendMode",
+                                         parameters: [kCIInputBackgroundImageKey: image])
+        return up.applyingFilter("CIMaximumCompositing",
+                                 parameters: [kCIInputBackgroundImageKey: down])
+    }
+
     static func measure(_ image: CIImage, ciContext: CIContext) -> GrainProfile {
         var extent = image.extent
         if extent.width > maxAnalysisSide || extent.height > maxAnalysisSide {
@@ -140,17 +159,8 @@ struct GrainProfile: Sendable {
         }
 
         let luminance = encodedLuminance(image.clampedToExtent())
-        // Two 3×3 passes ≈ a 5×5 median: a single 3×3 tracks the grain
-        // clumps and under-reads the grain level by ~15%.
-        let median = luminance.applyingFilter("CIMedianFilter")
-            .applyingFilter("CIMedianFilter")
-        // Residual magnitude, both polarities (blend modes may clamp at 0).
-        let up = luminance.applyingFilter("CISubtractBlendMode",
-                                          parameters: [kCIInputBackgroundImageKey: median])
-        let down = median.applyingFilter("CISubtractBlendMode",
-                                         parameters: [kCIInputBackgroundImageKey: luminance])
-        let residual = up.applyingFilter("CIMaximumCompositing",
-                                         parameters: [kCIInputBackgroundImageKey: down])
+        let median = despeckled(luminance)
+        let residual = residualMagnitude(of: luminance)
 
         func render(_ source: CIImage) -> [Float] {
             var pixels = [Float](repeating: 0, count: width * height)

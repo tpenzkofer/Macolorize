@@ -251,6 +251,25 @@ struct PipelineSmokeTests {
         #expect(value(at: CGPoint(x: 28, y: 28)) < 20)    // untouched stays black
     }
 
+    /// Manual heals must come back as the prefix's heal mask (Show Mask).
+    @Test(.enabled(if: ModelStore.isAvailable(.lama)))
+    func prefixReturnsManualHealMask() async throws {
+        let image = makeFadedImage()
+        let stroke = BrushStroke(points: [CGPoint(x: 0.3, y: 0.5), CGPoint(x: 0.7, y: 0.5)],
+                                 radius: 0.05)
+        let mask = try #require(RetouchMask.rasterize(strokes: [stroke],
+                                                      size: image.extent.size))
+        let (_, _, healMask) = try await ProcessingEngine.shared.materializedPrefix(
+            recipe: Recipe(), on: PipelineImage(image: image),
+            retouchMask: mask, proxyMaxDimension: 4096)
+        let overlay = try #require(healMask)
+        var pixel = [UInt8](repeating: 0, count: 4)
+        RenderService.context.render(overlay, toBitmap: &pixel, rowBytes: 4,
+                                     bounds: CGRect(x: 64, y: 64, width: 1, height: 1),
+                                     format: .RGBA8, colorSpace: nil)
+        #expect(pixel[0] > 200, "stroke center should be white, got \(pixel)")
+    }
+
     @Test func zeroStrengthIsIdentity() async throws {
         let faded = makeFadedImage()
         var settings = RestoreSettings()

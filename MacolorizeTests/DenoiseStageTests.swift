@@ -54,6 +54,39 @@ struct DenoiseStageTests {
     }
 }
 
+/// Heals must carry the scan's grain, or they read as smudges (issue #1:
+/// "dust fixes continue to blur the image").
+struct GrainMatchTests {
+    @Test(.enabled(if: ModelStore.isAvailable(.lama)))
+    func healedRegionMatchesSurroundingGrain() async throws {
+        let size = 512
+        var generator = SplitMix64(seed: 7)
+        var pixels = [UInt8](repeating: 255, count: size * size * 4)
+        for i in stride(from: 0, to: pixels.count, by: 4) {
+            let value = min(max(0.5 + 20.0 / 255 * generator.nextGaussian(), 0), 1)
+            let byte = UInt8((value * 255).rounded())
+            pixels[i] = byte; pixels[i + 1] = byte; pixels[i + 2] = byte
+        }
+        let image = CIImage(bitmapData: Data(pixels), bytesPerRow: size * 4,
+                            size: CGSize(width: size, height: size), format: .RGBA8,
+                            colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+        let hole = CGRect(x: 156, y: 156, width: 200, height: 200)
+        let mask = CIImage(color: .white).cropped(to: hole)
+            .composited(over: CIImage(color: .black).cropped(to: image.extent))
+
+        let healed = try await InpaintStage.apply(to: image, mask: mask,
+                                                  ciContext: RenderService.context)
+        func grain(_ source: CIImage, in rect: CGRect) -> Double {
+            let encoded = source.applyingFilter("CILinearToSRGBToneCurve").cropped(to: rect)
+            return GrainMatch.residualRMS(of: encoded, ciContext: RenderService.context)
+        }
+        let inside = grain(healed, in: hole.insetBy(dx: 30, dy: 30))
+        let outside = grain(healed, in: CGRect(x: 0, y: 0, width: 140, height: 512))
+        #expect(inside > outside * 0.7 && inside < outside * 1.3,
+                "healed grain \(inside) vs surrounding \(outside)")
+    }
+}
+
 /// Deterministic RNG so the grain fixture is identical on every run.
 private struct SplitMix64 {
     var state: UInt64
